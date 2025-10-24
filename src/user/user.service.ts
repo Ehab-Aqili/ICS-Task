@@ -3,19 +3,39 @@ import {
   ConflictException,
   HttpException,
   HttpStatus,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { JwtService } from '@nestjs/jwt';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { User } from './entities/user.entity';
-import { encodePassword } from './utils/HashPassword';
+import { encodePassword, matchPassword } from './utils/HashPassword';
+import { LoginDto } from './dto/login.dto';
+
+export interface JwtPayload {
+  id: string;
+  email: string;
+  name: string;
+  iat?: number;
+  exp?: number;
+  isRefreshToken?: boolean;
+}
+
+export interface LoginResponse {
+  message: string;
+  user: Partial<User>;
+  accessToken: string;
+  refreshToken?: string;
+}
 
 @Injectable()
 export class UserService {
   constructor(
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
+    private readonly jwtService: JwtService,
   ) {}
 
   async create(
@@ -83,5 +103,94 @@ export class UserService {
 
   remove(id: number) {
     return `This action removes a #${id} user`;
+  }
+
+  _generateAccessToken(user: User): string {
+    const payload: JwtPayload = {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      isRefreshToken: false,
+    };
+
+    return this.jwtService.sign(payload, {
+      expiresIn: '15m',
+    });
+  }
+
+  _generateRefreshToken(user: User): string {
+    const payload: JwtPayload = {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      isRefreshToken: true,
+    };
+
+    return this.jwtService.sign(payload, {
+      expiresIn: '7d',
+    });
+  }
+
+  generateTokens(user: User): { accessToken: string; refreshToken: string } {
+    return {
+      accessToken: this._generateAccessToken(user),
+      refreshToken: this._generateRefreshToken(user),
+    };
+  }
+
+  verifyToken(token: string): JwtPayload {
+    return this.jwtService.verify(token);
+  }
+
+  async login(loginDto: LoginDto): Promise<LoginResponse> {
+    try {
+      const { email, password } = loginDto;
+
+      const user = await this.userRepository.findOne({
+        where: { email, isDeleted: false },
+      });
+
+      if (!user) {
+        throw new UnauthorizedException('Invalid email or password');
+      }
+
+      if (!user.isActive) {
+        throw new UnauthorizedException('Account is deactivated');
+      }
+
+      const isPasswordValid = matchPassword(password, user.password);
+      if (!isPasswordValid) {
+        throw new UnauthorizedException('Invalid email or password');
+      }
+
+      const tokens = this.generateTokens(user);
+
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { password: _, ...userWithoutPassword } = user;
+
+      return {
+        message: 'Login successful',
+        user: userWithoutPassword,
+        accessToken: tokens.accessToken,
+        refreshToken: tokens.refreshToken,
+      };
+    } catch (error) {
+      if (error instanceof UnauthorizedException) {
+        throw error;
+      }
+      throw new HttpException('Login failed', HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+  }
+
+  async findOneById(id: string): Promise<User | null> {
+    return this.userRepository.findOne({
+      where: { id, isDeleted: false },
+    });
+  }
+
+  async findByEmail(email: string): Promise<User | null> {
+    return this.userRepository.findOne({
+      where: { email, isDeleted: false },
+    });
   }
 }

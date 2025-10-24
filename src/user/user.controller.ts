@@ -8,20 +8,46 @@ import {
   Delete,
   HttpCode,
   HttpStatus,
+  // Req,
 } from '@nestjs/common';
+// import { Request } from 'express';
 import { UserService } from './user.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { LoginDto } from './dto/login.dto';
+// import { User } from './entities/user.entity';
 
 @Controller('user')
 export class UserController {
-  constructor(private userService: UserService) {}
+  constructor(private readonly userService: UserService) {}
 
   @Post('register')
   @HttpCode(HttpStatus.CREATED)
   register(@Body() createUserDto: CreateUserDto) {
     return this.userService.create(createUserDto);
   }
+
+  @Post('login')
+  @HttpCode(HttpStatus.OK)
+  async login(@Body() loginDto: LoginDto) {
+    return this.userService.login(loginDto);
+  }
+
+  // @Get('profile')
+  // @UseGuards(JwtAuthGuard)
+  // getProfile(@GetUser() user: User) {
+  //   return {
+  //     message: 'Profile retrieved successfully',
+  //     user: {
+  //       id: user.id,
+  //       name: user.name,
+  //       email: user.email,
+  //       isActive: user.isActive,
+  //       createdAt: user.createdAt,
+  //       updatedAt: user.updatedAt,
+  //     },
+  //   };
+  // }
 
   @Post()
   create(@Body() createUserDto: CreateUserDto) {
