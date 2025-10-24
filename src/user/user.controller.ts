@@ -4,17 +4,16 @@ import {
   Post,
   Body,
   Patch,
-  Param,
   Delete,
   HttpCode,
   HttpStatus,
-  // Req,
 } from '@nestjs/common';
-// import { Request } from 'express';
 import { UserService } from './user.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { LoginDto } from './dto/login.dto';
+import { GetUser } from 'src/auth/get-user.decorator';
+import { User } from './entities/user.entity';
 // import { User } from './entities/user.entity';
 
 @Controller('user')
@@ -33,44 +32,31 @@ export class UserController {
     return this.userService.login(loginDto);
   }
 
-  // @Get('profile')
-  // @UseGuards(JwtAuthGuard)
-  // getProfile(@GetUser() user: User) {
-  //   return {
-  //     message: 'Profile retrieved successfully',
-  //     user: {
-  //       id: user.id,
-  //       name: user.name,
-  //       email: user.email,
-  //       isActive: user.isActive,
-  //       createdAt: user.createdAt,
-  //       updatedAt: user.updatedAt,
-  //     },
-  //   };
-  // }
-
-  @Post()
-  create(@Body() createUserDto: CreateUserDto) {
-    return this.userService.create(createUserDto);
-  }
-
   @Get()
-  findAll() {
-    return this.userService.findAll();
+  getProfile(@GetUser() user: User) {
+    return {
+      message: 'Profile retrieved successfully',
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        isActive: user.isActive,
+        isDeleted: user.isDeleted,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt,
+      },
+    };
   }
 
-  @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.userService.findOne(+id);
+  @Patch()
+  @HttpCode(HttpStatus.OK)
+  update(@Body() updateUserDto: UpdateUserDto, @GetUser() currentUser: User) {
+    return this.userService.update(currentUser.id, updateUserDto);
   }
 
-  @Patch(':id')
-  update(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto) {
-    return this.userService.update(+id, updateUserDto);
-  }
-
-  @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.userService.remove(+id);
+  @Delete()
+  @HttpCode(HttpStatus.OK)
+  remove(@GetUser() currentUser: User) {
+    return this.userService.remove(currentUser.id);
   }
 }

@@ -89,20 +89,131 @@ export class UserService {
     }
   }
 
-  findAll() {
-    return `This action returns all user`;
+  async findAll(): Promise<{ message: string; users: Partial<User>[] }> {
+    try {
+      const users = await this.userRepository.find({
+        where: { isDeleted: false },
+        select: ['id', 'name', 'email', 'isActive', 'createdAt', 'updatedAt'],
+      });
+
+      return {
+        message: 'Users retrieved successfully',
+        users,
+      };
+    } catch (error) {
+      console.error('Error retrieving users:', error);
+      throw new HttpException(
+        'Failed to retrieve users',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
   }
 
-  findOne(id: number) {
-    return `This action returns a #${id} user`;
+  async findOne(id: number): Promise<{ message: string; user: Partial<User> }> {
+    try {
+      const user = await this.userRepository.findOne({
+        where: { id: id.toString(), isDeleted: false },
+        select: ['id', 'name', 'email', 'isActive', 'createdAt', 'updatedAt'],
+      });
+
+      if (!user) {
+        throw new HttpException('User not found', HttpStatus.NOT_FOUND);
+      }
+
+      return {
+        message: 'User retrieved successfully',
+        user,
+      };
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new HttpException(
+        'Failed to retrieve user',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
   }
 
-  update(id: number, updateUserDto: UpdateUserDto) {
-    return `This action updates a #${id} ${updateUserDto.name} user`;
+  async update(
+    id: string,
+    updateUserDto: UpdateUserDto,
+  ): Promise<{ message: string; user: Partial<User> }> {
+    try {
+      const user = await this.userRepository.findOne({
+        where: { id: id.toString(), isDeleted: false },
+      });
+
+      if (!user) {
+        throw new HttpException('User not found', HttpStatus.NOT_FOUND);
+      }
+      console.log(
+        'existingUserByName && existingUserByName.id !== user.id',
+        updateUserDto.name,
+        user.name,
+      );
+      if (updateUserDto.name && updateUserDto.name === user.name) {
+        throw new ConflictException('User with this name already exists');
+      }
+
+      if (updateUserDto.email && updateUserDto.email === user.email) {
+        throw new ConflictException('User with this email already exists');
+      }
+
+      const updateData: Partial<User> = { ...updateUserDto };
+
+      await this.userRepository.update({ id: id.toString() }, updateData);
+
+      const updatedUser = await this.userRepository.findOne({
+        where: { id: id.toString() },
+        select: ['id', 'name', 'email', 'isActive', 'createdAt', 'updatedAt'],
+      });
+
+      return {
+        message: 'User updated successfully',
+        user: updatedUser!,
+      };
+    } catch (error) {
+      if (
+        error instanceof HttpException ||
+        error instanceof ConflictException
+      ) {
+        throw error;
+      }
+      throw new HttpException(
+        'Failed to update user',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
   }
 
-  remove(id: number) {
-    return `This action removes a #${id} user`;
+  async remove(id: string): Promise<{ message: string }> {
+    try {
+      const user = await this.userRepository.findOne({
+        where: { id: id.toString(), isDeleted: false },
+      });
+
+      if (!user) {
+        throw new HttpException('User not found', HttpStatus.NOT_FOUND);
+      }
+
+      await this.userRepository.update(
+        { id: id.toString() },
+        { isDeleted: true },
+      );
+
+      return {
+        message: 'User deleted successfully',
+      };
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new HttpException(
+        'Failed to delete user',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
   }
 
   _generateAccessToken(user: User): string {
