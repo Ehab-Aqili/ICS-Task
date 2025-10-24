@@ -144,14 +144,12 @@ export class UserService {
 
   async login(loginDto: LoginDto): Promise<LoginResponse> {
     try {
-      const { email, password } = loginDto;
+      const { identifier, password } = loginDto;
 
-      const user = await this.userRepository.findOne({
-        where: { email, isDeleted: false },
-      });
+      const user = await this.findByEmailOrUsername(identifier);
 
       if (!user) {
-        throw new UnauthorizedException('Invalid email or password');
+        throw new UnauthorizedException('Invalid email/username or password');
       }
 
       if (!user.isActive) {
@@ -160,7 +158,7 @@ export class UserService {
 
       const isPasswordValid = matchPassword(password, user.password);
       if (!isPasswordValid) {
-        throw new UnauthorizedException('Invalid email or password');
+        throw new UnauthorizedException('Invalid email/username or password');
       }
 
       const tokens = this.generateTokens(user);
@@ -191,6 +189,15 @@ export class UserService {
   async findByEmail(email: string): Promise<User | null> {
     return this.userRepository.findOne({
       where: { email, isDeleted: false },
+    });
+  }
+
+  async findByEmailOrUsername(identifier: string): Promise<User | null> {
+    return this.userRepository.findOne({
+      where: [
+        { email: identifier, isDeleted: false },
+        { name: identifier, isDeleted: false },
+      ],
     });
   }
 }
