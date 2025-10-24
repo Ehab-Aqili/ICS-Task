@@ -16,7 +16,6 @@ async function bootstrap() {
     }),
   );
 
-  // Register global response interceptor
   app.useGlobalInterceptors(new ResponseInterceptor());
 
   await app.listen(configService.get('PORT') ?? 3000);

@@ -37,16 +37,13 @@ export class ResponseInterceptor<T>
 
     return next.handle().pipe(
       map((data: ResponseData) => {
-        // Handle different response scenarios
         let message = 'Request successful';
         let responseData = data;
 
         if (data && typeof data === 'object') {
-          // If data has a message property, use it
           if ('message' in data && typeof data.message === 'string') {
             message = data.message;
 
-            // Keep the whole structured response (like login/register)
             responseData = data;
           }
         }
