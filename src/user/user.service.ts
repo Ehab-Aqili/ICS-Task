@@ -149,7 +149,7 @@ export class UserService {
       const user = await this.findByEmailOrUsername(identifier);
 
       if (!user) {
-        throw new UnauthorizedException('Invalid email/username or password');
+        throw new UnauthorizedException('Invalid email/username');
       }
 
       if (!user.isActive) {
@@ -158,7 +158,7 @@ export class UserService {
 
       const isPasswordValid = matchPassword(password, user.password);
       if (!isPasswordValid) {
-        throw new UnauthorizedException('Invalid email/username or password');
+        throw new UnauthorizedException('Invalid email/username');
       }
 
       const tokens = this.generateTokens(user);
