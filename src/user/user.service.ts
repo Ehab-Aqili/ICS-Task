@@ -147,11 +147,7 @@ export class UserService {
       if (!user) {
         throw new HttpException('User not found', HttpStatus.NOT_FOUND);
       }
-      console.log(
-        'existingUserByName && existingUserByName.id !== user.id',
-        updateUserDto.name,
-        user.name,
-      );
+
       if (updateUserDto.name && updateUserDto.name === user.name) {
         throw new ConflictException('User with this name already exists');
       }

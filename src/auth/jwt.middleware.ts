@@ -30,20 +30,12 @@ export class JwtMiddleware implements NestMiddleware {
 
       const token = authHeader.substring(7);
       const secret = this.configService.get<string>('JWT_SECRET');
-      console.log('Auth header:', req.headers.authorization);
-      console.log('Extracted token:', token);
-      console.log('JWT_SECRET:', this.configService.get('JWT_SECRET'));
 
-      console.log(1);
-      console.log('token', secret);
       const payload: { id: string } = this.jwtService.verify(token, {
         secret,
       });
 
-      console.log(2);
-
       const user = await this.userService.findOneById(payload.id);
-      console.log(3);
 
       if (!user) {
         throw new UnauthorizedException('User not found');
@@ -53,12 +45,11 @@ export class JwtMiddleware implements NestMiddleware {
         throw new UnauthorizedException('User account is deactivated');
       }
 
-      // Attach user to request object for controllers to access
       req.user = user;
 
       next();
     } catch (error) {
-      console.log('error', error);
+      console.error('JwtMiddleware error', error);
       if (error instanceof UnauthorizedException) {
         throw error;
       }

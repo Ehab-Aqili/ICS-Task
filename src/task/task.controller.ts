@@ -10,6 +10,7 @@ import {
 import { TaskService } from './task.service';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
+import { Task } from './entities/task.entity';
 // import { JwtAuthGuard } from '../auth/jwt.guard';
 import { GetUser } from '../auth/get-user.decorator';
 import { User } from '../user/entities/user.entity';
@@ -30,53 +31,217 @@ export class TaskController {
   constructor(private readonly taskService: TaskService) {}
 
   @Post()
-  @ApiOperation({ summary: 'Create a new task' })
-  @ApiResponse({ status: 201, description: 'Task successfully created.' })
-  @ApiResponse({ status: 400, description: 'Bad request.' })
-  @ApiResponse({ status: 401, description: 'Unauthorized.' })
-  @ApiBody({ type: CreateTaskDto })
+  @ApiOperation({
+    summary: 'Create a new task',
+    description:
+      'Creates a new task with title, description, status, and due date',
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Task successfully created.',
+    type: Task,
+    schema: {
+      example: {
+        id: 'a1b2c3d4-e5f6-7g8h-9i0j-k1l2m3n4o5p6',
+        title: 'Complete project documentation',
+        description: 'Write comprehensive documentation for all API endpoints',
+        status: 'PENDING',
+        dueDate: 1761384635,
+        createdAt: '2025-10-25T10:30:00.000Z',
+        updatedAt: '2025-10-25T10:30:00.000Z',
+        user: {
+          id: 'user-uuid',
+          email: 'user@example.com',
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Bad request - Invalid input data.',
+    schema: {
+      example: {
+        statusCode: 400,
+        message: [
+          'title should not be empty',
+          'dueDate must be a positive number',
+        ],
+        error: 'Bad Request',
+      },
+    },
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized - Invalid or missing JWT token.',
+    schema: {
+      example: {
+        statusCode: 401,
+        message: 'Unauthorized',
+        error: 'Unauthorized',
+      },
+    },
+  })
+  @ApiBody({
+    type: CreateTaskDto,
+    description: 'Task creation data',
+    schema: {
+      example: {
+        title: 'Complete project documentation',
+        description: 'Write comprehensive documentation for all API endpoints',
+        status: 'PENDING',
+        dueDate: 1761384635,
+      },
+    },
+  })
   create(@Body() createTaskDto: CreateTaskDto, @GetUser() user: User) {
-    console.log('user', user);
-    return this.taskService.create(createTaskDto);
+    return this.taskService.create(createTaskDto, user);
   }
 
   @Get()
-  @ApiOperation({ summary: 'Get all tasks' })
-  @ApiResponse({ status: 200, description: 'Tasks retrieved successfully.' })
-  @ApiResponse({ status: 401, description: 'Unauthorized.' })
+  @ApiOperation({
+    summary: 'Get all tasks',
+    description: 'Retrieves all tasks belonging to the authenticated user',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Tasks retrieved successfully.',
+    type: [Task],
+    schema: {
+      example: [
+        {
+          id: 'a1b2c3d4-e5f6-7g8h-9i0j-k1l2m3n4o5p6',
+          title: 'Complete project documentation',
+          description:
+            'Write comprehensive documentation for all API endpoints',
+          status: 'IN_PROGRESS',
+          dueDate: 1761384635,
+          createdAt: '2025-10-25T10:30:00.000Z',
+          updatedAt: '2025-10-25T14:20:00.000Z',
+          user: {
+            id: 'user-uuid',
+            email: 'user@example.com',
+          },
+        },
+        {
+          id: 'b2c3d4e5-f6g7-8h9i-0j1k-l2m3n4o5p6q7',
+          title: 'Review code changes',
+          description: 'Review pull request for task management features',
+          status: 'COMPLETED',
+          dueDate: 1760000000,
+          createdAt: '2025-10-24T09:15:00.000Z',
+          updatedAt: '2025-10-24T16:45:00.000Z',
+          user: {
+            id: 'user-uuid',
+            email: 'user@example.com',
+          },
+        },
+      ],
+    },
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized.',
+    schema: {
+      example: {
+        statusCode: 401,
+        message: 'Unauthorized',
+        error: 'Unauthorized',
+      },
+    },
+  })
   findAll(@GetUser() user: User) {
-    console.log('user', user);
-    return this.taskService.findAll();
+    return this.taskService.findAll(user);
   }
 
   @Get(':id')
   @ApiOperation({ summary: 'Get task by ID' })
-  @ApiParam({ name: 'id', type: 'number', description: 'Task ID' })
+  @ApiParam({ name: 'id', type: 'string', description: 'Task ID' })
   @ApiResponse({ status: 200, description: 'Task retrieved successfully.' })
   @ApiResponse({ status: 401, description: 'Unauthorized.' })
   @ApiResponse({ status: 404, description: 'Task not found.' })
-  findOne(@Param('id') id: string) {
-    return this.taskService.findOne(+id);
+  findOne(@Param('id') id: string, @GetUser() user: User) {
+    return this.taskService.findOne(id, user);
   }
 
   @Patch(':id')
-  @ApiOperation({ summary: 'Update task by ID' })
-  @ApiParam({ name: 'id', type: 'number', description: 'Task ID' })
-  @ApiResponse({ status: 200, description: 'Task successfully updated.' })
-  @ApiResponse({ status: 401, description: 'Unauthorized.' })
-  @ApiResponse({ status: 404, description: 'Task not found.' })
-  @ApiBody({ type: UpdateTaskDto })
-  update(@Param('id') id: string, @Body() updateTaskDto: UpdateTaskDto) {
-    return this.taskService.update(+id, updateTaskDto);
+  @ApiOperation({
+    summary: 'Update task by ID',
+    description: 'Updates specific fields of a task by its unique identifier',
+  })
+  @ApiParam({
+    name: 'id',
+    type: 'string',
+    description: 'Task unique identifier (UUID)',
+    example: 'a1b2c3d4-e5f6-7g8h-9i0j-k1l2m3n4o5p6',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Task successfully updated.',
+    type: Task,
+    schema: {
+      example: {
+        id: 'a1b2c3d4-e5f6-7g8h-9i0j-k1l2m3n4o5p6',
+        title: 'Complete project documentation - Updated',
+        description: 'Write comprehensive documentation with examples',
+        status: 'IN_PROGRESS',
+        dueDate: 1762000000,
+        createdAt: '2025-10-25T10:30:00.000Z',
+        updatedAt: '2025-10-25T16:45:00.000Z',
+        user: {
+          id: 'user-uuid',
+          email: 'user@example.com',
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized.',
+    schema: {
+      example: {
+        statusCode: 401,
+        message: 'Unauthorized',
+        error: 'Unauthorized',
+      },
+    },
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Task not found.',
+    schema: {
+      example: {
+        statusCode: 404,
+        message: 'Task with ID a1b2c3d4-e5f6-7g8h-9i0j-k1l2m3n4o5p6 not found',
+        error: 'Not Found',
+      },
+    },
+  })
+  @ApiBody({
+    type: UpdateTaskDto,
+    description: 'Fields to update (all optional)',
+    schema: {
+      example: {
+        title: 'Updated task title',
+        status: 'IN_PROGRESS',
+        dueDate: 1762000000,
+      },
+    },
+  })
+  update(
+    @Param('id') id: string,
+    @Body() updateTaskDto: UpdateTaskDto,
+    @GetUser() user: User,
+  ) {
+    return this.taskService.update(id, updateTaskDto, user);
   }
 
   @Delete(':id')
   @ApiOperation({ summary: 'Delete task by ID' })
-  @ApiParam({ name: 'id', type: 'number', description: 'Task ID' })
+  @ApiParam({ name: 'id', type: 'string', description: 'Task ID' })
   @ApiResponse({ status: 200, description: 'Task successfully deleted.' })
   @ApiResponse({ status: 401, description: 'Unauthorized.' })
   @ApiResponse({ status: 404, description: 'Task not found.' })
-  remove(@Param('id') id: string) {
-    return this.taskService.remove(+id);
+  remove(@Param('id') id: string, @GetUser() user: User) {
+    return this.taskService.remove(id, user);
   }
 }
