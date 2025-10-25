@@ -5,7 +5,7 @@ import {
 } from '@nestjs/common';
 import { Request, Response, NextFunction } from 'express';
 import { JwtService } from '@nestjs/jwt';
-import { UserService } from '../user/user.service';
+import { UserService, JwtPayload } from '../user/user.service';
 import { User } from '../user/entities/user.entity';
 import { ConfigService } from '@nestjs/config';
 
@@ -31,9 +31,25 @@ export class JwtMiddleware implements NestMiddleware {
       const token = authHeader.substring(7);
       const secret = this.configService.get<string>('JWT_SECRET');
 
-      const payload: { id: string } = this.jwtService.verify(token, {
-        secret,
-      });
+      let payload: JwtPayload;
+      let isTokenExpired = false;
+
+      try {
+        payload = this.jwtService.verify(token, { secret });
+      } catch (error: any) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+        if (error.name === 'TokenExpiredError') {
+          isTokenExpired = true;
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+          const decodedPayload = this.jwtService.decode(token);
+          if (!decodedPayload || typeof decodedPayload === 'string') {
+            throw new UnauthorizedException('Invalid token format');
+          }
+          payload = decodedPayload as JwtPayload;
+        } else {
+          throw new UnauthorizedException('Invalid token');
+        }
+      }
 
       const user = await this.userService.findOneById(payload.id);
 
@@ -45,9 +61,30 @@ export class JwtMiddleware implements NestMiddleware {
         throw new UnauthorizedException('User account is deactivated');
       }
 
-      req.user = user;
+      if (isTokenExpired) {
+        if (payload.isRefreshToken) {
+          return res.status(401).json({
+            message: 'Session expired',
+            statusCode: 401,
+            error: 'Session Expired',
+          });
+        } else {
+          throw new UnauthorizedException('Invalid token');
+        }
+      } else {
+        if (payload.isRefreshToken) {
+          const tokens = this.userService.generateTokens(user);
 
-      next();
+          return res.status(200).json({
+            message: 'Token refreshed successfully',
+            accessToken: tokens.accessToken,
+            refreshToken: tokens.refreshToken,
+          });
+        } else {
+          req.user = user;
+          next();
+        }
+      }
     } catch (error) {
       console.error('JwtMiddleware error', error);
       if (error instanceof UnauthorizedException) {
