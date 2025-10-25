@@ -4,6 +4,7 @@ import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ResponseInterceptor } from './common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import axios from 'axios';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -44,6 +45,22 @@ async function bootstrap() {
   app.useGlobalInterceptors(new ResponseInterceptor());
 
   await app.listen(configService.get('PORT') ?? 3000);
+
+  const url = `https://ics-task.onrender.com`;
+
+  setInterval(
+    () => {
+      axios
+        .get(url)
+        .then((res) => {
+          console.log('Self-ping:', res.data);
+        })
+        .catch((err: { message: string }) => {
+          console.error('Self-ping failed:', err.message);
+        });
+    },
+    14 * 60 * 1000,
+  );
 }
 bootstrap().catch((error) =>
   console.error('Application failed to start', error),
