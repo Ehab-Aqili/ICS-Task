@@ -11,6 +11,8 @@ import {
 import { UserService } from './user.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { SendOtpDto } from './dto/send-otp.dto';
+import { ValidateOtpDto } from './dto/validate-otp.dto';
 import { LoginDto } from './dto/login.dto';
 import { GetUser } from 'src/auth/get-user.decorator';
 import { User } from './entities/user.entity';
@@ -86,5 +88,27 @@ export class UserController {
   @ApiResponse({ status: 401, description: 'Unauthorized.' })
   remove(@GetUser() currentUser: User) {
     return this.userService.remove(currentUser.id);
+  }
+
+  @Post('send-otp')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Send OTP to user email for account activation' })
+  @ApiResponse({ status: 200, description: 'OTP sent successfully.' })
+  @ApiResponse({ status: 400, description: 'Bad request.' })
+  @ApiResponse({ status: 404, description: 'User not found.' })
+  @ApiBody({ type: SendOtpDto })
+  sendOtp(@Body() sendOtpDto: SendOtpDto) {
+    return this.userService.sendOtp(sendOtpDto);
+  }
+
+  @Post('validate-otp')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Validate OTP and activate user account' })
+  @ApiResponse({ status: 200, description: 'Account activated successfully.' })
+  @ApiResponse({ status: 400, description: 'Invalid or expired OTP.' })
+  @ApiResponse({ status: 404, description: 'User not found.' })
+  @ApiBody({ type: ValidateOtpDto })
+  validateOtp(@Body() validateOtpDto: ValidateOtpDto) {
+    return this.userService.validateOtp(validateOtpDto);
   }
 }
