@@ -5,12 +5,14 @@ import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 import { Task, TaskStatus } from './entities/task.entity';
 import { User } from '../user/entities/user.entity';
+import { AdviceService } from './advice.service';
 
 @Injectable()
 export class TaskService {
   constructor(
     @InjectRepository(Task)
     private taskRepository: Repository<Task>,
+    private adviceService: AdviceService,
   ) {}
 
   async create(createTaskDto: CreateTaskDto, user: User): Promise<Task> {
@@ -22,6 +24,22 @@ export class TaskService {
     });
 
     return await this.taskRepository.save(task);
+  }
+
+  async createWithAdvice(
+    createTaskDto: CreateTaskDto,
+    user: User,
+  ): Promise<{ task: Task; motivationalAdvice: string }> {
+    const task = await this.create(createTaskDto, user);
+    const motivationalAdvice = await this.adviceService.getRandomAdvice();
+
+    return {
+      task: {
+        ...task,
+        user,
+      },
+      motivationalAdvice,
+    };
   }
 
   async findAll(user: User): Promise<Task[]> {
@@ -41,6 +59,25 @@ export class TaskService {
     }
 
     return task;
+  }
+
+  async findOneWithAdvice(
+    id: string,
+    user: User,
+  ): Promise<{ task: Task; motivationalAdvice: string }> {
+    const task = await this.findOne(id, user);
+    const motivationalAdvice = await this.adviceService.getRandomAdvice();
+
+    if (!task) {
+      throw new NotFoundException(`Task with ID ${id} not found`);
+    }
+    return {
+      task: {
+        ...task,
+        user,
+      },
+      motivationalAdvice,
+    };
   }
 
   async update(
