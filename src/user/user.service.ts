@@ -4,15 +4,19 @@ import {
   HttpException,
   HttpStatus,
   UnauthorizedException,
+  BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { SendOtpDto } from './dto/send-otp.dto';
+import { ValidateOtpDto } from './dto/validate-otp.dto';
 import { User } from './entities/user.entity';
 import { encodePassword, matchPassword } from './utils/HashPassword';
 import { LoginDto } from './dto/login.dto';
+import { EmailService } from './services/email.service';
 
 export interface JwtPayload {
   id: string;
@@ -36,6 +40,7 @@ export class UserService {
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
     private readonly jwtService: JwtService,
+    private readonly emailService: EmailService,
   ) {}
 
   async create(
@@ -66,7 +71,6 @@ export class UserService {
         name,
         email,
         password: hashedPassword,
-        isActive: true,
       });
 
       const savedUser = await this.userRepository.save(newUser);
@@ -306,5 +310,116 @@ export class UserService {
         { name: identifier, isDeleted: false },
       ],
     });
+  }
+
+  async sendOtp(sendOtpDto: SendOtpDto): Promise<{ message: string }> {
+    try {
+      const { email } = sendOtpDto;
+
+      const user = await this.userRepository.findOne({
+        where: { email, isDeleted: false },
+      });
+
+      if (!user) {
+        throw new HttpException('User not found', HttpStatus.NOT_FOUND);
+      }
+
+      if (user.isActive) {
+        throw new BadRequestException('Account is already active');
+      }
+
+      const otp = Math.floor(100000 + Math.random() * 900000);
+
+      const otpExpiresAt = new Date();
+      otpExpiresAt.setMinutes(otpExpiresAt.getMinutes() + 1);
+
+      await this.userRepository.update({ id: user.id }, { otp, otpExpiresAt });
+
+      await this.emailService.sendOtpEmail(email, otp);
+
+      return {
+        message: 'OTP sent successfully to your email',
+      };
+    } catch (error) {
+      if (
+        error instanceof HttpException ||
+        error instanceof BadRequestException
+      ) {
+        throw error;
+      }
+      throw new HttpException(
+        'Failed to send OTP',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  async validateOtp(
+    validateOtpDto: ValidateOtpDto,
+  ): Promise<{ message: string; user: Partial<User> }> {
+    try {
+      const { email, otp } = validateOtpDto;
+
+      const user = await this.userRepository.findOne({
+        where: { email, isDeleted: false },
+      });
+
+      if (!user) {
+        throw new HttpException('User not found', HttpStatus.NOT_FOUND);
+      }
+
+      if (user.isActive) {
+        throw new BadRequestException('Account is already active');
+      }
+
+      if (!user.otp || !user.otpExpiresAt) {
+        throw new BadRequestException('No OTP found. Please request a new OTP');
+      }
+
+      const now = new Date();
+      if (now > user.otpExpiresAt) {
+        await this.userRepository.update(
+          { id: user.id },
+          { otp: null, otpExpiresAt: null },
+        );
+        throw new BadRequestException(
+          'OTP has expired. Please request a new OTP',
+        );
+      }
+
+      if (user.otp !== otp) {
+        throw new BadRequestException('Invalid OTP');
+      }
+
+      await this.userRepository.update(
+        { id: user.id },
+        {
+          isActive: true,
+          otp: null,
+          otpExpiresAt: null,
+        },
+      );
+
+      const updatedUser = await this.userRepository.findOne({
+        where: { id: user.id },
+        select: ['id', 'name', 'email', 'isActive', 'createdAt', 'updatedAt'],
+      });
+
+      return {
+        message: 'Account activated successfully',
+        user: updatedUser!,
+      };
+    } catch (error) {
+      if (
+        error instanceof HttpException ||
+        error instanceof BadRequestException
+      ) {
+        throw error;
+      }
+      throw new HttpException(
+        'Failed to validate OTP',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
   }
 }

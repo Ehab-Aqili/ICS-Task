@@ -32,6 +32,8 @@ export class AuthModule {
       .exclude(
         { path: 'user/register', method: RequestMethod.POST },
         { path: 'user/login', method: RequestMethod.POST },
+        { path: 'user/send-otp', method: RequestMethod.POST },
+        { path: 'user/validate-otp', method: RequestMethod.POST },
       )
       .forRoutes('*');
   }
